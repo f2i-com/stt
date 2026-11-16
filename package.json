@@ -1,0 +1,13 @@
+{
+  "name": "stt",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "STT (stt.computer): self-contained speech recognition & taught voice commands in Rust/WASM.",
+  "scripts": {
+    "build": "node tools/build_wasm.mjs",
+    "test": "cargo test --release && node tests/smoke.mjs",
+    "bench": "cargo run --release --example bench --",
+    "demo": "node demo/serve.mjs"
+  }
+}

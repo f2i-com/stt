@@ -1,0 +1,25 @@
+[package]
+name = "stt"
+version = "1.0.0"
+edition = "2021"
+homepage = "https://stt.computer"
+repository = "https://github.com/f2i-com/stt"
+description = "STT (stt.computer): speech recognition & taught voice commands in pure Rust and self-contained WebAssembly. Zero external dependencies."
+keywords = ["stt", "speech-recognition", "wasm", "conformer", "voice-commands"]
+categories = ["multimedia::audio", "wasm"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["embedded-model"]
+# Embeds the 13.7 MB int8 Conformer-CTC speech model directly inside the crate / `stt.wasm`
+# so `STT` works out of the box as a single self-contained `.wasm` file with zero external downloads.
+embedded-model = []
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

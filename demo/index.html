@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>STT · Speech Recognition Studio (stt.computer)</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand">
+      <h1><span class="brand-dot" id="brandDot"></span>STT</h1>
+      <p class="tagline">Self-contained speech recognition &amp; voice commands in Rust + WebAssembly · Zero servers · Zero network</p>
+    </div>
+    <div class="topbar-right">
+      <span class="badge live" id="perfBadge">Loading stt.wasm…</span>
+      <span class="badge">100% On-Device</span>
+      <button id="themeBtn" class="sm" type="button">Theme: Auto</button>
+    </div>
+  </header>
+
+  <div class="studio-grid">
+    <!-- LEFT COLUMN: Live Dictation, Audio Visualizer, File Drop & Word Timings -->
+    <div class="col">
+      <section class="panel" id="dropPanel" aria-label="Speech recognition studio">
+        <div class="panel-head">
+          <div class="row">
+            <h2 class="panel-title">Recognition Studio</h2>
+            <div class="seg" role="group" aria-label="Recognition mode">
+              <button type="button" id="modeDictationBtn" class="active" title="Free-form English speech-to-text">Dictation</button>
+              <button type="button" id="modeBothBtn" title="Matches taught commands on short phrases and dictates everything else">Hybrid (Both)</button>
+              <button type="button" id="modeCommandsBtn" title="Zero-model DTW voice command matching only">Commands Only</button>
+            </div>
+          </div>
+          <div class="row">
+            <button type="button" id="copyBtn" class="sm">Copy</button>
+            <button type="button" id="downloadTxtBtn" class="sm">↓ TXT</button>
+            <button type="button" id="clearBtn" class="sm">Clear</button>
+          </div>
+        </div>
+
+        <div class="transport">
+          <button type="button" id="micBtn" class="primary" disabled>● Start Microphone</button>
+          <button type="button" id="sampleBtn" disabled title="Play and transcribe LibriSpeech test utterance (henry.wav)">▶ Try Sample Audio</button>
+          <label class="file-btn" title="Transcribe any local .wav, .mp3, .webm, .ogg, or .m4a file">
+            📂 Transcribe File
+            <input type="file" id="fileInput" accept="audio/*,.wav,.mp3,.m4a,.ogg,.webm,.flac" hidden>
+          </label>
+        </div>
+
+        <div class="status-line" id="statusLine">
+          <span id="statusText">Initializing single-file stt.wasm…</span>
+          <span id="speedStat"></span>
+        </div>
+
+        <div class="meter-wrap" title="Bars: 10 ms microphone level (dBFS). Amber line: adaptive room noise floor.">
+          <canvas id="meterCanvas" width="720" height="76"></canvas>
+          <div class="meter-legend">
+            <span id="meterState">MIC IDLE</span>
+            <span id="meterDb">level — dB · floor — dB</span>
+          </div>
+        </div>
+
+        <div id="transcript" class="transcript-box"></div>
+        <div id="wordChips" class="word-chips"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Embed Single-File <code>stt.wasm</code> Anywhere</h2>
+        </div>
+        <pre class="code-box">&lt;script type="module"&gt;
+  const { module, instance: { exports: w } } = await WebAssembly.instantiateStreaming(fetch("./stt.wasm"));
+  const { STT } = Function("wasm", "wasmModule", new TextDecoder().decode(
+    new Uint8Array(w.memory.buffer, w.stt_glue_ptr(), w.stt_glue_len())
+  ))(w, module);
+
+  const stt = new STT();
+  const mic = await stt.listen({ onPhrase: (p) =&gt; console.log(p.text, p.words) });
+&lt;/script&gt;</pre>
+      </section>
+    </div>
+
+    <!-- RIGHT COLUMN: Taught Voice Commands, Engine Settings & Telemetry Log -->
+    <div class="col">
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Taught Voice Commands (DTW)</h2>
+          <div class="row">
+            <button type="button" id="exportCmdsBtn" class="sm" title="Download taught commands pack">Export</button>
+            <label class="file-btn sm" title="Import saved commands pack">
+              Import
+              <input type="file" id="importCmdsInput" accept=".sttcmds,.bin" hidden>
+            </label>
+            <button type="button" id="forgetCmdsBtn" class="sm">Forget All</button>
+          </div>
+        </div>
+
+        <div class="heard-card">
+          <div id="heardLabel" class="heard-label muted">No command heard yet.</div>
+          <div id="heardMeta" class="heard-meta">Teach 2–3 spoken examples per command — zero neural net required.</div>
+        </div>
+
+        <form id="teachForm" class="row">
+          <input type="text" id="teachInput" placeholder="Command phrase, e.g. lights on" autocomplete="off" maxlength="60">
+          <button type="submit" id="teachBtn" class="primary" disabled>Teach</button>
+        </form>
+
+        <ul id="cmdList" class="cmd-list"></ul>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Detection &amp; Matching Controls</h2>
+          <button type="button" id="resetCfgBtn" class="sm">Reset</button>
+        </div>
+        <div class="control-grid">
+          <div class="ctrl-row">
+            <label for="hangSlider">Pause Hang</label>
+            <input type="range" id="hangSlider" min="200" max="1500" step="50" value="600">
+            <span class="ctrl-val" id="hangVal">600 ms</span>
+          </div>
+          <div class="ctrl-row">
+            <label for="onsetSlider">Onset Threshold</label>
+            <input type="range" id="onsetSlider" min="6" max="30" step="1" value="15">
+            <span class="ctrl-val" id="onsetVal">+15 dB</span>
+          </div>
+          <div class="ctrl-row">
+            <label for="strictSlider">Command Strictness</label>
+            <input type="range" id="strictSlider" min="0" max="100" value="45">
+            <span class="ctrl-val" id="strictVal">4.61</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Telemetry Log</h2>
+        </div>
+        <div id="log" class="log-box"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

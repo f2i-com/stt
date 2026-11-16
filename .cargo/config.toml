@@ -1,0 +1,4 @@
+# WebAssembly builds use 128-bit SIMD (supported by every current browser and Node.js);
+# Conformer matrix-vector dot products run several times faster with it.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=+simd128"]
